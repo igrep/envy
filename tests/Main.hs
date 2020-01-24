@@ -5,6 +5,7 @@
 ------------------------------------------------------------------------------
 module Main ( main ) where
 ------------------------------------------------------------------------------
+import           Control.Monad (unless)
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Int
@@ -18,7 +19,6 @@ import           System.Envy
 import           Test.Hspec
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
-import           Test.QuickCheck.Monadic
 
 
 
@@ -103,72 +103,68 @@ main :: IO ()
 main = hspec $ do
   describe "Var ismorphisms hold" $ do
     it "Word8 Var isomorphism" $ property $
-     \(x :: Word8) -> Just x == fromVar (toVar x)
+     \(x :: Word8) -> Just x `shouldBe` fromVar (toVar x)
     it "Word16 Var isomorphism" $ property $
-     \(x :: Word16) -> Just x == fromVar (toVar x)
+     \(x :: Word16) -> Just x `shouldBe` fromVar (toVar x)
     it "Word32 Var isomorphism" $ property $
-     \(x :: Word32) -> Just x == fromVar (toVar x)
+     \(x :: Word32) -> Just x `shouldBe` fromVar (toVar x)
     it "Int Var isomorphism" $ property $
-     \(x :: Int) -> Just x == fromVar (toVar x)
+     \(x :: Int) -> Just x `shouldBe` fromVar (toVar x)
     it "Int8 Var isomorphism" $ property $
-     \(x :: Int8) -> Just x == fromVar (toVar x)
+     \(x :: Int8) -> Just x `shouldBe` fromVar (toVar x)
     it "Int16 Var isomorphism" $ property $
-     \(x :: Int16) -> Just x == fromVar (toVar x)
+     \(x :: Int16) -> Just x `shouldBe` fromVar (toVar x)
     it "Int32 Var isomorphism" $ property $
-     \(x :: Int32) -> Just x == fromVar (toVar x)
+     \(x :: Int32) -> Just x `shouldBe` fromVar (toVar x)
     it "Int64 Var isomorphism" $ property $
-     \(x :: Int64) -> Just x == fromVar (toVar x)
+     \(x :: Int64) -> Just x `shouldBe` fromVar (toVar x)
     it "String Var isomorphism" $ property $
-     \(x :: String) -> Just x == fromVar (toVar x)
+     \(x :: String) -> Just x `shouldBe` fromVar (toVar x)
     it "Double Var isomorphism" $ property $
-     \(x :: Double) -> Just x == fromVar (toVar x)
+     \(x :: Double) -> Just x `shouldBe` fromVar (toVar x)
     it "UTCTime Var isomorphism" $ property $
-     \(x :: UTCTime) -> Just x == fromVar (toVar x)
+     \(x :: UTCTime) -> Just x `shouldBe` fromVar (toVar x)
     it "ByteString Var isomorphism" $ property $
-     \(x :: B8.ByteString) -> Just x == fromVar (toVar x)
+     \(x :: B8.ByteString) -> Just x `shouldBe` fromVar (toVar x)
     it "ByteString Var isomorphism" $ property $
-     \(x :: BL8.ByteString) -> Just x == fromVar (toVar x)
+     \(x :: BL8.ByteString) -> Just x `shouldBe` fromVar (toVar x)
     it "Lazy Text Var isomorphism" $ property $
-     \(x :: LT.Text) -> Just x == fromVar (toVar x)
+     \(x :: LT.Text) -> Just x `shouldBe` fromVar (toVar x)
     it "Text Var isomorphism" $ property $
-     \(x :: T.Text) -> Just x == fromVar (toVar x)
+     \(x :: T.Text) -> Just x `shouldBe` fromVar (toVar x)
     it "() Var isomorphism" $ property $
-     \(x :: ()) -> Just x == fromVar (toVar x)
+     \(x :: ()) -> Just x `shouldBe` fromVar (toVar x)
   describe "Can set to and from environment" $ do
     it "Isomorphism through setEnvironment['] and decodeEnv" $ property $
-      \(pgConf::PGConfig) -> monadicIO $ do
-        res <- run $ do
-                 _ <- setEnvironment' pgConf
-                 decodeEnv
-        assert $ res == Right pgConf
+      \(pgConf::PGConfig) -> do
+        _ <- setEnvironment' pgConf
+        res <- decodeEnv
+        res `shouldBe` Right pgConf
     it "Storing and retrieving var" $ property $
-      \(x::String) -> monadicIO $ do
-        res <- run $ do
-                 _ <- setEnvironment $ makeEnv [ "HSPECENVY_" .= toVar x]
-                 runEnv $ env  "HSPECENVY_"
-        assert $ if isInfixOf "\NUL" x then True else res == Right x
+      \(x::String) -> do
+        _ <- setEnvironment $ makeEnv [ "HSPECENVY_" .= toVar x]
+        res <- runEnv $ env  "HSPECENVY_"
+        unless (isInfixOf "\NUL" x) $ res `shouldBe` Right x
   describe "Can use generic FromEnv" $
     it "Isomorphism through setEnvironment and decodeEnv" $ property $
-      \(ci::ConnectInfo) -> monadicIO $ do
-        res <- run $ do
-                 let ConnectInfo{..} = ci
-                 _ <- setEnvironment $
-                          makeEnv [ "PG_HOST" .= pgHost
-                                  , "PG_PORT" .= pgPort
-                                  , "PG_USER" .= pgUser
-                                  , "PG_PASS" .= pgPass
-                                  , "PG_DB"   .= pgDB
-                                  ]
-                 decodeWithDefaults (defConfig :: ConnectInfo)
-        assert $ res == ci
+      \(ci::ConnectInfo) -> do
+        let ConnectInfo{..} = ci
+        _ <- setEnvironment $
+                 makeEnv [ "PG_HOST" .= pgHost
+                         , "PG_PORT" .= pgPort
+                         , "PG_USER" .= pgUser
+                         , "PG_PASS" .= pgPass
+                         , "PG_DB"   .= pgDB
+                         ]
+        res <- decodeWithDefaults (defConfig :: ConnectInfo)
+        res `shouldBe` ci
   describe "Can use generic FromEnvNoDefault" $
     it "Isomorphism through setEnvironment and decodeEnv" $ property $
-      \(u::UserInfo) -> monadicIO $ do
-        res <- run $ do
-                 let UserInfo{..} = u
-                 _ <- setEnvironment $
-                          makeEnv [ "USER_NAME" .= (userName ++ "")
-                                  , "USER_AGE" .= userAge
-                                  ]
-                 decodeEnv
-        assert $  if isInfixOf "\NUL" (userName u) then True else res == Right u
+      \(u::UserInfo) -> do
+        let UserInfo{..} = u
+        _ <- setEnvironment $
+                 makeEnv [ "USER_NAME" .= (userName ++ "")
+                         , "USER_AGE" .= userAge
+                         ]
+        res <- decodeEnv
+        unless (isInfixOf "\NUL" userName) $ res `shouldBe` Right u
